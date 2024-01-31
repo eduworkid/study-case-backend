@@ -7,66 +7,70 @@ const fs = require('fs');
 
 const store = async (req, res, next) => {
     try {
-        let payload = req.body;
+      let payload = req.body;
 
-        if(payload.category){
-            let category = await Category
-            .findOne({name: {$regex: payload.category, $options: 'i'}})
-            if(category){
-                payload = {...payload, category: category._id}
-            } else {
-                delete payload.category
-            }
-        }
-        if (payload.tags && payload.tags.length > 0) {
-            let tags = await Tag.find({ name: { $in: payload.tags } });
-        
-            if (tags.length > 0) {
-                payload = { ...payload, tags: tags.map(tag => tag._id) };
-            } else {
-                delete payload.tags;
-            }
-        }
-        
-
-        if (req.file) {
-            let tmp_path = req.file.path;
-            let originalExt = req.file.originalname.split('.')[req.file.originalname.split('.').length - 1];
-            let filename = req.file.filename + '.' + originalExt;
-            let target_path = config.rootpath + `/public/images/product/${filename}`;
-
-            const src = fs.createReadStream(tmp_path);
-            const dest = fs.createWriteStream(target_path);
-
-            src.on('end', async () => {
-                try {
-                    let product = new Product({ ...payload, image_url: filename });
-                    await product.save();
-                    return res.json(product);
-                } catch (err) {
-                    fs.unlink(target_path, () => {});
-                    if (err && err.name === 'ValidationError') {
-                        return res.json({
-                            error: 1,
-                            message: err.message,
-                            fields: err.errors
-                        });
-                    }
-                    next(err);
-                }
-            });
-
-            src.on('error', (err) => {
-                fs.unlink(target_path, () => {});
-                next(err);
-            });
-
-            src.pipe(dest);
+      if (payload.category) {
+        let category = await Category.findOne({
+          name: { $regex: payload.category, $options: "i" },
+        });
+        if (category) {
+          payload = { ...payload, category: category._id };
         } else {
-            let product = new Product(payload);
+          delete payload.category;
+        }
+      }
+      if (payload.tags && payload.tags.length > 0) {
+        let tags = await Tag.find({ name: { $in: payload.tags } });
+
+        if (tags.length > 0) {
+          payload = { ...payload, tags: tags.map((tag) => tag._id) };
+        } else {
+          delete payload.tags;
+        }
+      }
+
+      if (req.file) {
+        let tmp_path = req.file.path;
+        let originalExt =
+          req.file.originalname.split(".")[
+            req.file.originalname.split(".").length - 1
+          ];
+        let filename = req.file.filename + "." + originalExt;
+        let target_path =
+          config.rootpath + `/public/images/product/${filename}`;
+
+        const src = fs.createReadStream(tmp_path);
+        const dest = fs.createWriteStream(target_path);
+
+        src.on("end", async () => {
+          try {
+            let product = new Product({ ...payload, image_url: filename });
             await product.save();
             return res.json(product);
-        }
+          } catch (err) {
+            fs.unlink(target_path, () => {});
+            if (err && err.name === "ValidationError") {
+              return res.json({
+                error: 1,
+                message: err.message,
+                fields: err.errors,
+              });
+            }
+            next(err);
+          }
+        });
+
+        src.on("error", (err) => {
+          fs.unlink(target_path, () => {});
+          next(err);
+        });
+
+        src.pipe(dest);
+      } else {
+        let product = new Product(payload);
+        await product.save();
+        return res.json(product);
+      }
     } catch (err) {
         if (err && err.name === 'ValidationError') {
             return res.json({
@@ -165,12 +169,11 @@ const index = async (req, res, next) => {
         let criteria = {};
 
         if (q.length) {
-            criteria = {
-                ...criteria,
-                name: { $regex: `${q}`, $options: "i" }
-            };
+          criteria = {
+            ...criteria,
+            name: { $regex: `${q}`, $options: "i" },
+          };
         }
-
         if (category.length) {
             let categoryResult = await Category.findOne({ name: { $regex: `${category}`, $options: "i" } });
 
